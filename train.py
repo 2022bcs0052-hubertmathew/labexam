@@ -7,7 +7,7 @@ from sklearn.metrics import mean_squared_error
 np.random.seed(42)
 X = np.random.rand(100,1)
 y = 3*X + np.random.randn(100,1)*0.1
-
+#TRIGGER
 model = LinearRegression()
 model.fit(X,y)
 
