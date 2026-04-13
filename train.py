@@ -10,7 +10,7 @@ y = 3*X + np.random.randn(100,1)*0.1
 #TRIGGER
 model = LinearRegression()
 model.fit(X,y)
-
+#trigger for 2
 pred = model.predict(X)
 
 mse = mean_squared_error(y,pred)
