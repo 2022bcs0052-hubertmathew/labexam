@@ -1,0 +1,86 @@
+name: MLOps Conditional Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+
+      - name: Install Dependencies
+        run: |
+          pip install scikit-learn numpy
+
+      - name: Train Model
+        run: python train.py
+
+      - name: Upload Model
+        uses: actions/upload-artifact@v3
+        with:
+          name: model
+          path: |
+            model.pkl
+            metrics.json
+
+  deploy:
+    needs: train
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: model
+
+      - name: Compare MSE
+        id: compare
+        run: |
+          NEW_MSE=$(cat metrics.json | jq .mse)
+          BEST_MSE=${{ vars.BEST_MSE }}
+
+          echo "New MSE: $NEW_MSE"
+          echo "Best MSE: $BEST_MSE"
+
+          if (( $(echo "$NEW_MSE < $BEST_MSE" | bc -l) )); then
+            echo "improved=true" >> $GITHUB_OUTPUT
+          else
+            echo "improved=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip Deployment
+        if: steps.compare.outputs.improved == 'false'
+        run: |
+          echo "Model did not improve. Skipping deployment."
+          echo "Hubert Mathew Sunil - 2022BCS005"
+
+      - name: Login DockerHub
+        if: steps.compare.outputs.improved == 'true'
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker
+        if: steps.compare.outputs.improved == 'true'
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/labexam:latest .
+
+      - name: Push Docker
+        if: steps.compare.outputs.improved == 'true'
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/labexam:latest
